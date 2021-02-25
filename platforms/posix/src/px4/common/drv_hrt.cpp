@@ -326,7 +326,7 @@ hrt_abstime hrt_absolute_time()
         ret -= _delay_interval;
 
         if (ret < max_time) {
-                //printf("ret = %"PRIu64", max = %"PRIu64" delay=%"PRIu64"\n", ret, max_time, _delay_interval);
+                printf("ret = %u64, max = %u64 delay=%u64\n", ret, max_time, _delay_interval);
                 PX4_ERR("WARNING! TIME IS NEGATIVE! %d vs %d. %s", (int)ret, (int)max_time,
                         (called__hrt_time_interval ? "CALLED rollback corrected time" : "DID NOT CALLED rollback corrected time"));
                 ret = max_time;
