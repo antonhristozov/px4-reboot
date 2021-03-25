@@ -9,6 +9,17 @@
 #include <sys/mman.h>
 #include <signal.h>
 #include <drivers/drv_hrt.h>
+#include <time.h>
+#include <unistd.h>
+#include <sys/syscall.h>
+#include <linux/version.h>
+
+extern "C"{
+struct timespec64 {
+	signed long long tv_sec;			        /* seconds */
+	long		tv_nsec;		/* nanoseconds */
+};
+}
 
 extern "C" {
 #include <checkpointapi.h>
@@ -22,7 +33,7 @@ extern "C" __EXPORT int checkpoint_main(int argc, char *argv[]);
 // int ckpfid=-1;
 // int ckpid;
 
-static int get_timestamp(int cfid, struct timespec *tp)
+static int get_timestamp(int cfid, struct timespec64 *tp)
 {
 	// struct timeval now;
 	// int rv = gettimeofday(&now, NULL);
@@ -31,7 +42,6 @@ static int get_timestamp(int cfid, struct timespec *tp)
 	// }
 	// tp->tv_sec = now.tv_sec;
 	// tp->tv_nsec = now.tv_usec * 1000;
-
 	ckp_clock_gettime(cfid, 0, tp);
 	return 0;
 }
@@ -46,7 +56,7 @@ static void do_save()
 
 	if (ckp_checkpoint_timestamp == NULL) {
 		// Dio: Allocate memory for the checkpoint timestamp
-		if ((ckp_checkpoint_timestamp = (struct timespec *)malloc(sizeof(struct timespec))) == NULL) {
+		if ((ckp_checkpoint_timestamp = (struct timespec64 *)malloc(sizeof(struct timespec64))) == NULL) {
 			perror("trying to allocate memory for checkpoint timestamp");
 			return;
 		}
@@ -57,7 +67,7 @@ static void do_save()
 
 		// Dio: allocate a page for persistent storage across rollbacks
 		// At this point only the rollback timestamp will be stored
-		ckp_rollback_timestamp = (struct timespec *) mmap(NULL, sysconf(_SC_PAGE_SIZE), PROT_READ | PROT_WRITE,
+		ckp_rollback_timestamp = (struct timespec64 *) mmap(NULL, sysconf(_SC_PAGE_SIZE), PROT_READ | PROT_WRITE,
 					 MAP_SHARED | MAP_ANONYMOUS | MAP_LOCKED, -1, 0);
 
 		if (ckp_rollback_timestamp == NULL) {
@@ -85,7 +95,7 @@ static void do_save()
 
 	hrt_abstime ckp_time = hrt_absolute_time();
 
-	if ((ckpid = ckp_create_checkpoint(ckpfid, getpid(), ckp_rollback_timestamp, sizeof(struct timespec))) < 0) {
+	if ((ckpid = ckp_create_checkpoint(ckpfid, getpid(), ckp_rollback_timestamp, sizeof(struct timespec64))) < 0) {
 		printf("could not create the checkpoint\n");
 		//return;
 	}

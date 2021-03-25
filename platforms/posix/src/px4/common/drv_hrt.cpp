@@ -54,6 +54,13 @@
 #include <lockstep_scheduler/lockstep_scheduler.h>
 #endif
 
+extern "C"{
+struct timespec64 {
+	signed long long tv_sec;			        /* seconds */
+	long		tv_nsec;		/* nanoseconds */
+};
+}
+
 // Intervals in usec
 static constexpr unsigned HRT_INTERVAL_MIN = 50;
 static constexpr unsigned HRT_INTERVAL_MAX = 50000000;
@@ -107,13 +114,13 @@ pthread_mutex_t _hrt_mutex = PTHREAD_MUTEX_INITIALIZER;
 #include <sys/time.h>
 #include <checkpointapi.h>
 
-struct timespec *ckp_checkpoint_timestamp = NULL;
-struct timespec *ckp_rollback_timestamp = NULL;
+struct timespec64 *ckp_checkpoint_timestamp = NULL;
+struct timespec64 *ckp_rollback_timestamp = NULL;
 int ckpfid = -1;
 int ckpid = -1;
 static int ckp_rollback_delay_corrected = 0;
 
-static void timespec_diff(struct timespec *start, struct timespec *stop, struct timespec *result)
+static void timespec_diff(struct timespec64 *start, struct timespec64 *stop, struct timespec64 *result)
 {
         //if ((stop->tv_nsec - start->tv_nsec) < 0) {
         if (stop->tv_nsec < start->tv_nsec) { 
@@ -129,9 +136,9 @@ static void timespec_diff(struct timespec *start, struct timespec *stop, struct 
 
 static int printed_rollback_info = 0;
 
-static void correct_rollback(struct timespec *tp)
+static void correct_rollback(struct timespec64 *tp)
 {
-        struct timespec elapsed;
+        struct timespec64 elapsed;
         struct timespec in;
         //int retry=0;
         //int locking_called=0;
@@ -183,6 +190,7 @@ hrt_abstime _hrt_absolute_time_internal(void)
 #ifdef USE_UREBOOT
         int retry = 0;
         int locking_called = 0;
+        struct timespec64 ts64; 
 #endif
 
 #if defined(__PX4_QURT)
@@ -212,12 +220,16 @@ hrt_abstime _hrt_absolute_time_internal(void)
                 if (!px4_timestart) {
                         printf("setting px4_timestart\n");
                         px4_clock_gettime(CLOCK_MONOTONIC, &ts);
-                        correct_rollback(&ts);
+                        ts64.tv_sec = ts.tv_sec;
+                        ts64.tv_nsec = ts.tv_nsec;
+                        correct_rollback(&ts64);
                         px4_timestart = ts_to_abstime(&ts);
                 }
 
                 px4_clock_gettime(CLOCK_MONOTONIC, &ts);
-                correct_rollback(&ts);
+                ts64.tv_sec = ts.tv_sec;
+                ts64.tv_nsec = ts.tv_nsec;
+                correct_rollback(&ts64);
 
 
                 if (locking_called) {
@@ -342,9 +354,7 @@ hrt_abstime hrt_absolute_time()
 	const uint64_t abstime = lockstep_scheduler->get_absolute_time();
 	return abstime - px4_timestart_monotonic;
 #else // defined(ENABLE_LOCKSTEP_SCHEDULER)
-	struct timespec ts;
-	px4_clock_gettime(CLOCK_MONOTONIC, &ts);
-	return ts_to_abstime(&ts);
+	return px4_clock_gettime(CLOCK_MONOTONIC, &ts);
 #endif // defined(ENABLE_LOCKSTEP_SCHEDULER)
 #endif
 }
